@@ -2,6 +2,7 @@ pub mod command;
 pub mod cat_file;
 pub mod hash_object;
 pub mod object;
+pub mod ls_tree;
 #[allow(unused_imports)]
 use std::env;
 #[allow(unused_imports)]
@@ -29,6 +30,11 @@ pub enum Command {
         write: bool,
         file: PathBuf 
     }, 
+    LsTree { 
+        #[clap(long)]
+        name_only: bool,
+        tree_hash: String 
+    }
 }
 
 
@@ -48,6 +54,7 @@ fn main() -> anyhow::Result<()>{
         },
         Command::CatFile { pretty_print, object_hash } => return cat_file::CatFile(pretty_print, object_hash),
         Command::HashObject { write, file } => hash_object::hash_object(&file, write)?,
+        Command::LsTree { name_only, tree_hash } => ls_tree::ls_tree(name_only, tree_hash)?,
     }
     // Uncomment this block to pass the first stage
     // let args: Vec<String> = env::args().collect();

@@ -33,11 +33,10 @@ pub struct Object<R> {
     pub(crate) reader: R
 }
 impl Object<()> { 
-    pub(crate) fn read(pretty_print: bool, object_hash: String) -> anyhow::Result<Object<impl BufRead>>{ 
-        anyhow::ensure!(pretty_print, "p flag must be there");
+    pub(crate) fn read(object_hash: String) -> anyhow::Result<Object<impl BufRead>>{ 
         let file = std::fs::File::open(format!(".git/objects/{}/{}", &object_hash[..2], &object_hash[2..])).context("read the hash file")?;
         let reader = BufReader::new(file);
-        let mut z = ZlibDecoder::new(reader);
+        let z = ZlibDecoder::new(reader);
         let mut decoder_reader = BufReader::new(z);
         let mut buf = Vec::new();
         decoder_reader.read_until(0, &mut buf).context("read from .git/objects")?;

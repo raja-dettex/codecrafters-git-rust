@@ -9,7 +9,7 @@ use crate::object::Object;
 
 pub(crate) fn CatFile(pretty_print: bool, object_hash: String) -> anyhow::Result<()>{ 
     anyhow::ensure!(pretty_print, "p flag must be there");
-    let mut object = Object::read(pretty_print, object_hash)?;
+    let mut object = Object::read(object_hash)?;
     match object.kind { 
         Kind::Blob => { 
             let mut stdout = std::io::stdout();
