@@ -6,11 +6,16 @@ use std::fs;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
+use std::path::Path;
+use std::path::PathBuf;
 use anyhow::Context;
 //use anyhow::Ok;
 use clap::{Parser,Subcommand};
-use flate2::bufread::ZlibDecoder;
+use flate2::Compression;
+use flate2::read::ZlibDecoder;
+use flate2::write::ZlibEncoder;
 use hex::decode;
+use sha1::Sha1;
 use std::io::Write;
 use anyhow::Error as AnyhowError;
 /// Simple program to greet a person
@@ -27,7 +32,12 @@ pub enum Command {
         #[clap(short = 'p')]
         pretty_print: bool,
         object_hash: String
-    }  
+    },
+    HashObject {
+        #[clap(short = 'w')]
+        write: bool,
+        file: PathBuf 
+    }, 
 }
 
 enum Kind { 
@@ -84,6 +94,36 @@ fn main() -> anyhow::Result<()>{
             }
             
             
+        },
+        Command::HashObject { write, file } => { 
+        fn write_blob<W>(file: &PathBuf, mut writer: W) -> std::io::Result<String>
+            where W: Write 
+            { 
+                let mut encoder = ZlibEncoder::new(writer, Compression::default());
+                let mut writer = HashWriter { 
+                    writer: encoder,
+                    hasher: Sha1::new()
+                };
+                let stat = std::fs::metadata(file).expect("file stat");
+                write!(writer, "blob ")?;
+                write!(writer, "{}\0", stat.len())?;
+                let mut file = std::fs::File::open(file)?;
+                std::io::copy(&mut file, &mut writer)?;
+                let _  = writer.writer.finish()?;
+                let hash = writer.hasher.finalize();
+                Ok(hex::encode(hash))
+
+            }
+            let hash = if write { 
+                let temp  = "temp";
+                let hash = write_blob(&file, std::fs::File::create(temp)?)?;
+                std::fs::create_dir_all(format!(".git/objects/{}", &hash[..2]))?;
+                std::fs::rename(temp, format!(".git/objects/{}/{}", &hash[..2], &hash[2..]))?;
+                hash
+            } else { 
+                write_blob(&file, std::io::sink())?
+            };
+            println!("{hash}");
         }
     }
     // Uncomment this block to pass the first stage
@@ -94,5 +134,25 @@ fn main() -> anyhow::Result<()>{
     //     println!("unknown command: {}", args[1])
     // }
     Ok(())
+}
+
+use sha1::Digest;
+struct HashWriter<W> { 
+    writer: W,
+    hasher: Sha1
+}
+
+impl<W> Write for HashWriter<W> 
+where W: Write 
+{
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.writer.write(&buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
 }
 
